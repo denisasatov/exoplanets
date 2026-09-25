@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта экзопланет Галактики — NASA Exoplanet Archive</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- 3D-сцена -->
+<div id="scene"></div>
+
+<!-- Верхняя панель -->
+<header id="topbar">
+  <div class="brand">
+    <span class="logo">🪐</span>
+    <span class="title">Карта экзопланет</span>
+    <span class="subtitle">Млечный Путь · <span id="dataDate"></span></span>
+  </div>
+
+  <div class="search">
+    <input id="searchInput" list="planetList" type="text" autocomplete="off"
+           placeholder="Найти планету, напр. «Kepler-22 b»">
+    <datalist id="planetList"></datalist>
+    <button id="btnSearch" class="btn accent">Найти</button>
+  </div>
+
+  <div class="tools">
+    <button id="btnGalaxyView" class="btn">Обзор Галактики</button>
+    <button id="btnSunView" class="btn">К Солнцу</button>
+    <label class="chk" title="Логарифмическая шкала расстояний: окрестность Солнца раздвигается">
+      <input type="checkbox" id="chLog"><i></i>Лог. шкала</label>
+    <label class="chk" title="Подписи ближайших планет при приближении">
+      <input type="checkbox" id="chLabels" checked><i></i>Метки</label>
+  </div>
+</header>
+
+<!-- Легенда и фильтры -->
+<aside id="legend">
+  <h3>Метод открытия <span class="muted">(клик — скрыть/показать)</span></h3>
+  <div id="legendItems"></div>
+
+  <h3>Год открытия <span class="year" id="yearValue">1992</span></h3>
+  <input type="range" id="yearRange" min="1992" max="2026" value="1992" step="1">
+  <div class="scale-labels"><span id="yearMin">1992</span><span id="yearMax">2026</span></div>
+
+  <h3>Системы</h3>
+  <label class="chk"><input type="checkbox" id="chMulti" checked><i></i>Многопланетные системы</label>
+  <label class="chk"><input type="checkbox" id="chSingle" checked><i></i>Одиночные планеты</label>
+</aside>
+
+<!-- Статистика -->
+<div id="stats"></div>
+
+<!-- Подсказка по управлению -->
+<div id="hint">
+  <b>ЛКМ</b> — вращение · <b>ПКМ</b> — сдвиг · <b>колесо</b> — масштаб ·
+  <b>клик по точке</b> — карточка планеты
+</div>
+
+<!-- Всплывающая подсказка при наведении -->
+<div id="tooltip" class="hidden"></div>
+
+<!-- Карточка планеты -->
+<div id="popup" class="hidden" role="dialog" aria-modal="false">
+  <button id="popupClose" class="popup-close" title="Закрыть">✕</button>
+  <div id="popupBody"></div>
+</div>
+
+<!-- Подписи на карте -->
+<div id="labelLayer">
+  <div class="maplabel special sun" id="sunLabel">☀️ Солнце</div>
+  <div class="maplabel special gc" id="gcLabel">★ Центр Галактики</div>
+</div>
+
+<!-- Загрузка -->
+<div id="loader"><div class="spinner"></div><div>Загрузка карты Галактики…</div></div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="js/data.js"></script>
+<script src="js/galaxy.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
