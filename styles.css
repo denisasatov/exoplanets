@@ -251,6 +251,55 @@ body.cmp-open #labelLayer{display:none}
 }
 .cmp-foot b{color:#9db4dc}
 
+/* ---------- справка о методах открытия ---------- */
+.mh-btn{width:100%;margin-top:9px;text-align:center;justify-content:center}
+#methodHelp{
+  position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  padding:74px 16px 22px;background:rgba(3,6,14,.72);backdrop-filter:blur(6px);
+}
+#methodHelp.hidden{display:none}
+.mh-card{
+  width:min(780px,100%);max-height:100%;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:rgba(120,180,255,.28) transparent;
+  background:var(--panel);border:1px solid var(--panel-border);border-radius:16px;
+  padding:20px 22px 18px;box-shadow:0 26px 74px rgba(0,0,0,.72);
+  animation:mhIn .2s ease-out;
+}
+.mh-card::-webkit-scrollbar{width:8px}
+.mh-card::-webkit-scrollbar-thumb{background:rgba(120,180,255,.28);border-radius:4px}
+.mh-card::-webkit-scrollbar-track{background:transparent}
+@keyframes mhIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+.mh-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.mh-title{font-size:19px;font-weight:600;color:#fff;line-height:1.25}
+.mh-intro{margin:10px 0 15px;font-size:13px;line-height:1.62;color:#a9bde0}
+.mh-intro b{color:#eaf3ff}
+.mh-item{padding:13px 0;border-top:1px dashed rgba(127,155,208,.25)}
+.mh-item:first-child{padding-top:0;border-top:none}
+.mh-row{display:flex;align-items:center;gap:9px}
+.mh-row .dot{width:11px;height:11px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}
+.mh-name{font-size:14.5px;font-weight:600;color:#fff}
+.mh-en{font-size:11.5px;color:#5f7396;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mh-cnt{
+  margin-left:auto;font-size:12px;color:#9db4dc;font-variant-numeric:tabular-nums;flex:none;
+}
+.mh-bar{
+  height:5px;border-radius:3px;background:rgba(255,255,255,.06);
+  margin:8px 0 9px;overflow:hidden;
+}
+.mh-bar i{display:block;height:100%;border-radius:3px;opacity:.8}
+.mh-item p{margin:5px 0 0;font-size:12.8px;line-height:1.6;color:#a9bde0}
+.mh-item p b{color:#eaf3ff}
+.mh-note{color:#6d82a8!important}
+.mh-ex{color:#8ea3c9!important}
+.mh-ex b{color:#8ea3c9!important;font-weight:600}
+.mh-foot{
+  margin-top:15px;padding-top:12px;border-top:1px solid rgba(127,155,208,.2);
+  font-size:11.5px;line-height:1.55;color:#6d82a8;
+}
+.mh-foot b{color:#9db4dc;font-variant-numeric:tabular-nums}
+.mh-foot a{color:var(--accent);text-decoration:none}
+.mh-foot a:hover{text-decoration:underline}
+
 /* ---------- статистика / подсказка ---------- */
 #stats{
   position:fixed;left:14px;bottom:14px;z-index:20;

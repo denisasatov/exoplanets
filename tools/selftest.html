@@ -20,9 +20,14 @@ function ok(name, cond, extra) {
   R.push((cond ? 'PASS ' : 'FAIL ') + name + (extra !== undefined ? '  :: ' + extra : ''));
 }
 
-setTimeout(function () {
+/* Цикл рендера держит виртуальное время headless-браузера «в ритме» реального,
+   иначе бюджет истечёт до загрузки iframe и тест выполнится слишком рано. */
+(function spin() { requestAnimationFrame(spin); })();
+
+setTimeout(function tryStart() {
   try {
     var f = document.getElementById('f'), w = f.contentWindow, d = f.contentWindow.document;
+    if (!(w.ExoMap && w.ExoMap.planetCount > 5000)) { setTimeout(tryStart, 300); return; }
 
     ok('страница загрузилась (ExoMap)', !!(w.ExoMap && w.ExoMap.planetCount > 5000),
        w.ExoMap ? w.ExoMap.planetCount : 'нет ExoMap');
@@ -92,24 +97,37 @@ setTimeout(function () {
     ok('изображение планеты сгенерировано',
        !!(pimg && pimg.src.indexOf('data:image/jpeg') === 0),
        pimg ? pimg.src.slice(0, 26) : 'нет .pimg img');
-    ok('карточка позиционирована справа', parseInt(pop.style.left, 10) >= w.innerWidth - 420,
-       pop.style.left + ' / ' + w.innerWidth);
 
-    /* --- закрытие по Escape --- */
-    w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
-    ok('Escape закрывает сравнение', cmp.classList.contains('hidden'));
-    w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
-    ok('Escape закрывает карточку', pop.classList.contains('hidden'));
-    ok('легенда снова видна',
-       w.getComputedStyle(d.getElementById('legend')).display !== 'none');
+    /* позиция карточки и Escape — после кадра анимации (updatePopupPos в animate) */
+    setTimeout(function () {
+      try {
+        ok('карточка позиционирована справа', parseInt(pop.style.left, 10) >= w.innerWidth - 420,
+           pop.style.left + ' / ' + w.innerWidth);
+
+        w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+        ok('Escape закрывает сравнение', cmp.classList.contains('hidden'));
+        w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+        ok('Escape закрывает карточку', pop.classList.contains('hidden'));
+        ok('легенда снова видна',
+           w.getComputedStyle(d.getElementById('legend')).display !== 'none');
+      } catch (e) {
+        ok('ИСКЛЮЧЕНИЕ (часть 2)', false, (e && e.message) + ' | ' + (e && e.stack));
+      }
+      finish();
+    }, 400);
+    return;
+
   } catch (e) {
     ok('ИСКЛЮЧЕНИЕ', false, (e && e.message) + ' | ' + (e && e.stack));
   }
+  finish();
 
-  R.forEach(function (l) { console.log('SELFTEST ' + l); });
-  document.getElementById('out').textContent = R.join('\n');
-  var fails = R.filter(function (l) { return l.indexOf('FAIL') === 0; }).length;
-  document.title = 'SELFTEST DONE fails=' + fails;
+  function finish() {
+    R.forEach(function (l) { console.log('SELFTEST ' + l); });
+    document.getElementById('out').textContent = R.join('\n');
+    var fails = R.filter(function (l) { return l.indexOf('FAIL') === 0; }).length;
+    document.title = 'SELFTEST DONE fails=' + fails;
+  }
 }, 2500);
 </script>
 </body>

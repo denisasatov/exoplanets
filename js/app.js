@@ -371,7 +371,8 @@
     var totalMappable = 0;
     for (var i = 0; i < N; i++) if (hasDist[i]) totalMappable++;
     statsEl.innerHTML =
-      'Показано <b>' + visibleCount + '</b> из <b>' + N + '</b> планет' +
+      'Показано <b>' + visibleCount + '</b> из <b>' + N + '</b> ' +
+        plural(N, 'планеты', 'планет', 'планет') +
       (N - totalMappable > 0 ? ' <span style="color:#6d82a8">· ' + (N - totalMappable) +
         ' без измеренного расстояния скрыты</span>' : '') +
       '<br><span style="color:#6d82a8">шкала: ' +
@@ -410,6 +411,119 @@
       updateVisibility();
     });
     typeBox.appendChild(row);
+  });
+
+  /* ---------- справка о методах открытия ---------- */
+  var METHOD_HELP = {
+    'Transit': {
+      how: 'Планета проходит по диску звезды, и на несколько часов её блеск чуть уменьшается — ' +
+        'обычно на 0,1–2 %. Глубина провала даёт <b>радиус</b> планеты, промежутки между ' +
+        'провалами — длину года.',
+      note: 'Нужен вид «с ребра»: если орбита наклонена иначе, транзита не будет. ' +
+        'Массу этот метод не даёт — её обычно измеряют лучевыми скоростями.',
+      ex: 'Kepler-452 b, TRAPPIST-1 e'
+    },
+    'Radial Velocity': {
+      how: 'Планета заставляет звезду качаться вокруг общего центра масс. Из-за эффекта Доплера ' +
+        'спектр звезды периодически краснеет и синеет: период колебаний — длина года планеты, ' +
+        'амплитуда — её масса.',
+      note: 'Измеряется масса, умноженная на синус наклона орбиты (M·sin i), — то есть ' +
+        'нижний предел массы, а не точное значение.',
+      ex: '51 Peg b — первая планета у солнцеподобной звезды (1995 г.)'
+    },
+    'Microlensing': {
+      how: 'Когда звезда с планетой проходит на фоне далёкой звезды-фона, их гравитация на ' +
+        'мгновение усиливает свет фона: вспышка длится от нескольких часов до нескольких дней.',
+      note: 'Ловит холодные и далёкие планеты, даже свободно плавающие (без звезды). ' +
+        'Главный минус — вспышка не повторяется: понаблюдать за той же планетой второй раз нельзя.',
+      ex: 'OGLE-2005-BLG-390 L — одна из самых холодных экзопланет'
+    },
+    'Imaging': {
+      how: 'Свет звезды закрывают коронографом (затвором-«заглушкой»), и на снимке остаётся ' +
+        'сама планета: молодая, большая и ещё горячая, она светится в инфракрасных лучах.',
+      note: 'Подходит только для широких орбит и молодых систем; планету видно именно в момент ' +
+        'наблюдения, а не по косвенным признакам.',
+      ex: 'Beta Pictoris b, HR 8799 e'
+    },
+    'Transit Timing Variations': {
+      how: 'Если в системе несколько планет, они притягиваются друг к друга, и транзиты приходят ' +
+        'чуть раньше или позже расписания. По этим отклонениям вычисляют массу соседа — часто ' +
+        'той планеты, которая сама транзитов не показывает.',
+      note: 'Работает только в многопланетных системах и требует многолетних наблюдений.',
+      ex: 'Kepler-9 b'
+    },
+    'Eclipse Timing Variations': {
+      how: 'То же самое, но для затмений в двойных звёздах: если рядом с парой есть планета, ' +
+        'моменты затмений «гуляют» вперёд-назад относительно графика.',
+      note: 'Редкий метод: так нашли несколько планет, вращающихся сразу вокруг двух звёзд.',
+      ex: 'NN Ser c'
+    },
+    'Pulsar Timing': {
+      how: 'Пульсар подаёт радиоимпульсы с точностью атомных часов. Планета заставляет его то ' +
+        '«опаздывать», то «спешить» — по этим паузам её и обнаруживают.',
+      note: 'Именно так в 1992 году была открыта самая первая экзопланета. Орбиты у таких ' +
+        'планет обычно крошечные, а среда у пульсара — крайне враждебная для жизни.',
+      ex: 'PSR B1257+12 b'
+    },
+    'Astrometry': {
+      how: 'Измеряют точное положение звезды на небе: планета заставляет звезду выписывать ' +
+        'маленькую петлю вокруг общего центра масс.',
+      note: 'В отличие от лучевых скоростей даёт <b>полную массу</b> планеты, а не M·sin i, ' +
+        'но требует очень точных и многолетних измерений.',
+      ex: 'Так ищет планеты космический аппарат Gaia'
+    },
+    'OTHER': {
+      how: 'Остальные редкие приёмы: модуляция блеска (планета переворачивается и меняет ' +
+        'отражённый свет), кинематика протопланетного диска (планета «прокапывает» в нём ' +
+        'борозду), тайминг пульсаций самой звезды и другие.',
+      note: 'Суммарно — небольшая доля открытий, но каждый случай помогает увидеть ' +
+        'что-то недоступное основным методам.',
+      ex: ''
+    }
+  };
+
+  var methodHelp = document.getElementById('methodHelp');
+  var mhList = document.getElementById('mhList');
+  var maxCount = 1;
+  for (var mc = 0; mc < counts.length; mc++) if (counts[mc] > maxCount) maxCount = counts[mc];
+
+  var mhHtml = '';
+  GROUPS.forEach(function (g, idx) {
+    var h = METHOD_HELP[g.key] || {
+      how: 'Метод открытия, объединяющий редкие и нестандартные случаи.',
+      note: '', ex: ''
+    };
+    var w = Math.max(1, Math.round(counts[idx] / maxCount * 100));
+    mhHtml += '<div class="mh-item">' +
+      '<div class="mh-row">' +
+        '<span class="dot" style="background:' + g.color + ';color:' + g.color + '"></span>' +
+        '<span class="mh-name">' + g.ru + '</span>' +
+        '<span class="mh-en">' + g.key + '</span>' +
+        '<span class="mh-cnt">' + counts[idx] + ' ' +
+          plural(counts[idx], 'планета', 'планеты', 'планет') + '</span>' +
+      '</div>' +
+      '<div class="mh-bar"><i style="width:' + w + '%;background:' + g.color + '"></i></div>' +
+      '<p>' + h.how + '</p>' +
+      (h.note ? '<p class="mh-note"><b>Особенность:</b> ' + h.note + '</p>' : '') +
+      (h.ex ? '<p class="mh-ex"><b>Пример:</b> ' + h.ex + '</p>' : '') +
+      '</div>';
+  });
+  mhList.innerHTML = mhHtml;
+  document.getElementById('mhTotal').textContent =
+    N + ' ' + plural(N, 'планета', 'планеты', 'планет');
+
+  function setMethodHelp(show) {
+    methodHelp.classList.toggle('hidden', !show);
+  }
+  document.getElementById('btnMethodHelp').addEventListener('click', function () {
+    setMethodHelp(true);
+  });
+  document.getElementById('mhClose').addEventListener('click', function () {
+    setMethodHelp(false);
+  });
+  // клик по затемнению вокруг карточки закрывает справку
+  methodHelp.addEventListener('click', function (e) {
+    if (e.target === methodHelp) setMethodHelp(false);
   });
 
   /* ---------- цвет точек: метод открытия или тип планеты ---------- */
@@ -645,7 +759,7 @@
       '<span class="chip" style="color:' + g.color + ';border-color:' + g.color + '">' +
       '<span class="dot"></span>' + g.ru + '</span>' +
       (typeof p.y === 'number' ? '<span class="chip" style="color:#9fb4d8;border-color:#3d5175">' + p.y + ' г.</span>' : '') +
-      (p.np && p.np > 1 ? '<span class="chip" style="color:#9fb4d8;border-color:#3d5175">система: ' + p.np + ' планет</span>' : '') +
+      (p.np && p.np > 1 ? '<span class="chip" style="color:#9fb4d8;border-color:#3d5175">система: ' + p.np + ' ' + plural(p.np, 'планета', 'планеты', 'планет') + '</span>' : '') +
       '</div>';
     html += planetImage(p);
 
@@ -690,7 +804,8 @@
     html += kv('Радиус', num(p.sr, 2, 'R☉'));
     html += kv('Возраст', num(p.age, 2, 'млрд лет'));
     html += kv('Видимая величина', num(p.v, 2, 'm<sub>V</sub>'));
-    html += kv('Состав системы', p.ns ? p.ns + ' зв. · ' + (p.np || 1) + ' планет' : null);
+    html += kv('Состав системы', p.ns ? p.ns + ' зв. · ' + (p.np || 1) + ' ' +
+      plural(p.np || 1, 'планета', 'планеты', 'планет') : null);
     html += '</div>';
 
     html += '<div class="sec"><div class="sec-title">Открытие</div>';
@@ -823,6 +938,7 @@
   searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (!methodHelp.classList.contains('hidden')) { setMethodHelp(false); return; }
     if (compareOpen) {
       if (!cmpHelp.classList.contains('hidden')) setCmpHelp(false);
       else closeCompare();
