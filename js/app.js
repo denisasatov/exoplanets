@@ -30,16 +30,49 @@
     return groupByKey[name] || groupByKey.OTHER;
   }
 
+  /* ================= типы планет (по размеру / массе) ================= */
+  var TYPES = [
+    { key: 'terr',  ru: 'Землеподобные',   hint: 'R < 1.5 R⊕',          color: '#e29578' },
+    { key: 'super', ru: 'Суперземли',      hint: '1.5 – 2.5 R⊕',        color: '#a3e635' },
+    { key: 'mini',  ru: 'Мини-нептуны',    hint: '2.5 – 4 R⊕',          color: '#22d3ee' },
+    { key: 'nep',   ru: 'Ледяные гиганты', hint: '4 – 8 R⊕',            color: '#6366f1' },
+    { key: 'gas',   ru: 'Газовые гиганты', hint: 'R ≥ 8 R⊕',            color: '#f0abfc' },
+    { key: 'unk',   ru: 'Без данных',      hint: 'нет размера и массы', color: '#7d8aa3' }
+  ];
+
+  function typeOf(p) {
+    var r = (typeof p.r === 'number') ? p.r : null;
+    if (r !== null) {
+      if (r < 1.5) return 0;
+      if (r < 2.5) return 1;
+      if (r < 4)   return 2;
+      if (r < 8)   return 3;
+      return 4;
+    }
+    var m = (typeof p.m === 'number') ? p.m : null;   // запасная классификация по массе, M⊕
+    if (m !== null) {
+      if (m < 2)   return 0;
+      if (m < 10)  return 1;
+      if (m < 50)  return 2;
+      if (m < 300) return 3;
+      return 4;
+    }
+    return 5;
+  }
+
   /* ================= подготовка данных ================= */
   var N = PLANETS.length;
   var basePos = new Float32Array(N * 3);    // базовые координаты, kpc
   var colors = new Float32Array(N * 3);
+  var colorsMethod = new Float32Array(N * 3);  // цвета по методу открытия (режим «Метод»)
+  var colorsType = new Float32Array(N * 3);    // цвета по типу планеты (режим «Тип»)
   var vis = new Uint8Array(N);
   var hasDist = new Uint8Array(N);
   var distPc = new Float32Array(N);
   var galL = new Float32Array(N);           // галактическая долгота, рад
   var galB = new Float32Array(N);           // галактическая широта, рад
   var groupIdx = new Uint8Array(N);
+  var typeIdx = new Uint8Array(N);
   var sortedIdx = [];                       // индексы по возрастанию расстояния
 
   var RA_NGP = 192.85948 * RAD, DEC_NGP = 27.12825 * RAD, L_NCP = 122.93192 * RAD;
@@ -85,9 +118,13 @@
     }
     var gi = groupOf(p.me).i;
     groupIdx[i0] = gi;
+    typeIdx[i0] = typeOf(p);
     var c = hexToRgb(GROUPS[gi].color);
-    colors[o] = c[0]; colors[o + 1] = c[1]; colors[o + 2] = c[2];
+    colorsMethod[o] = c[0]; colorsMethod[o + 1] = c[1]; colorsMethod[o + 2] = c[2];
+    var tc = hexToRgb(TYPES[typeIdx[i0]].color);
+    colorsType[o] = tc[0]; colorsType[o + 1] = tc[1]; colorsType[o + 2] = tc[2];
   }
+  colors.set(colorsMethod);
   sortedIdx.sort(function (a, b) { return distPc[a] - distPc[b]; });
 
   function hexToRgb(hex) {
@@ -305,12 +342,13 @@
 
   /* ================= фильтры ================= */
   var methodOn = GROUPS.map(function () { return true; });
+  var typeOn = TYPES.map(function () { return true; });
   var yearFrom = MIN_YEAR;
   var showSingle = true, showMulti = true;
 
-  function passes(i) {
-    if (!hasDist[i]) return false;
+  function passesFilters(i) {
     if (!methodOn[groupIdx[i]]) return false;
+    if (!typeOn[typeIdx[i]]) return false;
     var y = PLANETS[i].y;
     if (typeof y === 'number' && y < yearFrom) return false;
     var multi = (PLANETS[i].np || 1) > 1;
@@ -318,6 +356,7 @@
     if (!multi && !showSingle) return false;
     return true;
   }
+  function passes(i) { return hasDist[i] === 1 && passesFilters(i); }
 
   var statsEl = document.getElementById('stats');
   var visibleCount = 0;
@@ -326,6 +365,7 @@
     for (var i = 0; i < N; i++) { vis[i] = passes(i) ? 1 : 0; if (vis[i]) visibleCount++; }
     if (selected >= 0 && !vis[selected]) deselect();
     applyPositions();
+    if (compareOpen) { rebuildCmp(); drawCompare(); }
   }
   function updateStats() {
     var totalMappable = 0;
@@ -340,7 +380,8 @@
 
   /* ================= интерфейс: легенда ================= */
   var counts = GROUPS.map(function () { return 0 });
-  for (var ic = 0; ic < N; ic++) counts[groupIdx[ic]]++;
+  var typeCounts = TYPES.map(function () { return 0 });
+  for (var ic = 0; ic < N; ic++) { counts[groupIdx[ic]]++; typeCounts[typeIdx[ic]]++; }
 
   var legendBox = document.getElementById('legendItems');
   GROUPS.forEach(function (g, idx) {
@@ -355,6 +396,49 @@
     });
     legendBox.appendChild(row);
   });
+
+  var typeBox = document.getElementById('typeItems');
+  TYPES.forEach(function (t, idx) {
+    var row = document.createElement('div');
+    row.className = 'lg-item';
+    if (t.hint) row.title = t.hint;
+    row.innerHTML = '<span class="dot" style="background:' + t.color + ';color:' + t.color +
+      '"></span><span class="name">' + t.ru + '</span><span class="cnt">' + typeCounts[idx] + '</span>';
+    row.addEventListener('click', function () {
+      typeOn[idx] = !typeOn[idx];
+      row.classList.toggle('off', !typeOn[idx]);
+      updateVisibility();
+    });
+    typeBox.appendChild(row);
+  });
+
+  /* ---------- цвет точек: метод открытия или тип планеты ---------- */
+  var colorMode = 'method';
+  var colorModeBox = document.getElementById('colorMode');
+  colorModeBox.addEventListener('click', function (e) {
+    var cm = e.target.getAttribute && e.target.getAttribute('data-cm');
+    if (!cm || cm === colorMode) return;
+    colorMode = cm;
+    for (var b = 0; b < colorModeBox.children.length; b++) {
+      var btn = colorModeBox.children[b];
+      btn.classList.toggle('on', btn.getAttribute('data-cm') === cm);
+    }
+    colors.set(cm === 'type' ? colorsType : colorsMethod);
+    planetGeom.attributes.color.needsUpdate = true;
+    if (compareOpen) drawCompare();
+  });
+
+  /* ---------- сворачивание панели фильтров ---------- */
+  var legendEl = document.getElementById('legend');
+  var legendShowBtn = document.getElementById('legendShow');
+  function setLegendHidden(hide) {
+    legendEl.classList.toggle('hide', hide);
+    legendShowBtn.classList.toggle('on', hide);
+  }
+  document.getElementById('legendFold').addEventListener('click', function () {
+    setLegendHidden(true);
+  });
+  legendShowBtn.addEventListener('click', function () { setLegendHidden(false); });
 
   var yearRange = document.getElementById('yearRange');
   var yearValue = document.getElementById('yearValue');
@@ -447,6 +531,111 @@
     return null;
   }
 
+  /* ---------- визуализация планеты (генерируется по параметрам) ----------
+     Реальных фотографий экзопланет почти нет, поэтому планета рисуется
+     на canvas: цвет — по равновесной температуре, полосы — у газовых
+     гигантов, размер шара — по радиусу. ГСЧ детерминирован по имени,
+     так что картинка у конкретной планеты всегда одинаковая.            */
+  function planetImage(p) {
+    var hasR = typeof p.r === 'number' && p.r > 0;
+    var hasT = typeof p.teq === 'number' && p.teq > 0;
+    if (!hasR && !hasT) {
+      return '<div class="pimg"><div class="pimg-none">' +
+        'Нет данных о радиусе и температуре — визуализация невозможна</div></div>';
+    }
+    var url = null;
+    try { url = renderPlanetImage(p); } catch (e) { url = null; }
+    if (!url) return '';
+    return '<div class="pimg"><img src="' + url + '" alt="">' +
+      '<div class="pimg-cap">Художественное впечатление — сгенерировано по радиусу ' +
+      'и равновесной температуре</div></div>';
+  }
+
+  function renderPlanetImage(p) {
+    var Wp = 480, Hp = 190;
+    var cv = document.createElement('canvas');
+    cv.width = Wp; cv.height = Hp;
+    var g = cv.getContext('2d');
+    if (!g) return null;
+
+    var seed = 7;
+    for (var c = 0; c < p.n.length; c++) seed = (seed * 31 + p.n.charCodeAt(c)) >>> 0;
+    function rnd() { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+
+    // космический фон со звёздами
+    var bg = g.createLinearGradient(0, 0, 0, Hp);
+    bg.addColorStop(0, '#050912'); bg.addColorStop(1, '#090f1d');
+    g.fillStyle = bg; g.fillRect(0, 0, Wp, Hp);
+    for (var s = 0; s < 110; s++) {
+      g.fillStyle = 'rgba(255,255,255,' + (0.15 + rnd() * 0.7).toFixed(2) + ')';
+      g.beginPath();
+      g.arc(rnd() * Wp, rnd() * Hp, 0.3 + rnd() * 1.2, 0, TAU);
+      g.fill();
+    }
+
+    var r = (typeof p.r === 'number' && p.r > 0) ? p.r : 1;
+    var teq = (typeof p.teq === 'number' && p.teq > 0) ? p.teq : null;
+    var gas = r >= 2.5 || (typeof p.mj === 'number' && p.mj >= 0.2);
+
+    // цвет поверхности по равновесной температуре
+    var col;
+    if (teq === null) col = [0.62, 0.66, 0.75];
+    else if (teq < 160) col = [0.85, 0.93, 1.00];      // ледяной
+    else if (teq < 250) col = [0.48, 0.68, 0.95];      // холодный
+    else if (teq < 350) col = [0.34, 0.63, 0.72];      // умеренный
+    else if (teq < 800) col = [0.79, 0.63, 0.43];      // песочный
+    else col = [0.86, 0.42, 0.22];                     // раскалённый
+    function rgb(w) {
+      return 'rgb(' + Math.min(255, col[0] * 255 * (w || 1) | 0) + ',' +
+        Math.min(255, col[1] * 255 * (w || 1) | 0) + ',' +
+        Math.min(255, col[2] * 255 * (w || 1) | 0) + ')';
+    }
+
+    var cx = Wp / 2, cy = Hp / 2;
+    var lr = Math.log(r / 0.4) / Math.log(16 / 0.4);    // лог. шкала радиуса: 0.4…16 R⊕
+    var R = Math.max(30, Math.min(74, 30 + lr * 44));
+
+    // свечение атмосферы
+    g.save();
+    g.shadowColor = rgb(1);
+    g.shadowBlur = 26;
+    g.fillStyle = rgb(1);
+    g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.fill();
+    g.restore();
+
+    // поверхность
+    g.save();
+    g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.clip();
+    if (gas) {
+      var band = 0;
+      for (var y = -R; y < R; y += 7) {
+        var w = 0.82 + 0.18 * Math.sin(band * 1.7 + rnd() * 0.6) + (rnd() - 0.5) * 0.06;
+        band++;
+        g.fillStyle = rgb(w);
+        g.fillRect(cx - R, cy + y, R * 2, 8);
+      }
+    } else {
+      g.fillStyle = rgb(1);
+      g.fillRect(cx - R, cy - R, R * 2, R * 2);
+      for (var b = 0; b < 26; b++) {                    // облака / материки / пятна
+        var bx = cx + (rnd() - 0.5) * 2 * R, by = cy + (rnd() - 0.5) * 2 * R;
+        g.fillStyle = rgb(0.76 + rnd() * 0.5);
+        g.globalAlpha = 0.5;
+        g.beginPath(); g.arc(bx, by, 3 + rnd() * R * 0.3, 0, TAU); g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+    // освещение: свет слева сверху, противоположный лимб в тени
+    var lg = g.createRadialGradient(cx - R * 0.38, cy - R * 0.42, R * 0.1, cx, cy, R * 1.05);
+    lg.addColorStop(0, 'rgba(255,255,255,0.20)');
+    lg.addColorStop(0.45, 'rgba(0,0,0,0)');
+    lg.addColorStop(1, 'rgba(0,0,0,0.78)');
+    g.fillStyle = lg; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+    g.restore();
+
+    return cv.toDataURL('image/jpeg', 0.85);
+  }
+
   function buildPopup(i) {
     var p = PLANETS[i], g = GROUPS[groupIdx[i]];
     var html = '';
@@ -458,6 +647,7 @@
       (typeof p.y === 'number' ? '<span class="chip" style="color:#9fb4d8;border-color:#3d5175">' + p.y + ' г.</span>' : '') +
       (p.np && p.np > 1 ? '<span class="chip" style="color:#9fb4d8;border-color:#3d5175">система: ' + p.np + ' планет</span>' : '') +
       '</div>';
+    html += planetImage(p);
 
     if (hasDist[i]) {
       html += '<div class="sec"><div class="sec-title">Планета</div>';
@@ -549,11 +739,13 @@
     if (selMark.visible) setPointPos(selMark, getPos(i));
     if (opts.fly && hasDist[i]) flyToSelected();
     updateStats();
+    if (compareOpen) drawCompare();
   }
   function deselect() {
     selected = -1;
     popup.classList.add('hidden');
     selMark.visible = false;
+    if (compareOpen) drawCompare();
   }
   function flyToSelected() {
     if (selected < 0 || !hasDist[selected]) return;
@@ -614,6 +806,10 @@
       methodOn[groupIdx[i]] = true;
       legendBox.children[groupIdx[i]].classList.remove('off');
     }
+    if (!typeOn[typeIdx[i]]) {
+      typeOn[typeIdx[i]] = true;
+      typeBox.children[typeIdx[i]].classList.remove('off');
+    }
     var y = PLANETS[i].y;
     if (typeof y === 'number' && y < yearFrom) {
       yearFrom = y; yearRange.value = y; yearValue.textContent = y;
@@ -625,7 +821,273 @@
   }
   document.getElementById('btnSearch').addEventListener('click', doSearch);
   searchInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') doSearch(); });
-  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') deselect(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (compareOpen) {
+      if (!cmpHelp.classList.contains('hidden')) setCmpHelp(false);
+      else closeCompare();
+    } else deselect();
+  });
+
+  /* ================= вид «Сравнение» =================
+     Точечный график: X — положение орбиты относительно зоны обитаемости
+     (0 — внутренняя граница, 1 — внешняя, лог. шкала по освещённости),
+     Y — радиус или масса планеты в единицах Земли (лог. шкала).       */
+  var S_IN = 1.10, S_OUT = 0.36;               // границы зоны обитаемости, освещённость S⊕
+  var cmpEl = document.getElementById('compare');
+  var cmpCanvas = document.getElementById('cmpCanvas');
+  var cmpCtx = cmpCanvas.getContext('2d');
+  var cmpTip = document.getElementById('cmpTip');
+  var cmpCount = document.getElementById('cmpCount');
+  var compareOpen = false, cmpYm = 'r', cmpHzOnly = false;
+  var cmpPts = [], cmpHover = -1;
+
+  function plural(n, one, few, many) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) return many;
+    if (b > 1 && b < 5) return few;
+    if (b === 1) return one;
+    return many;
+  }
+
+  function cmpValue(i) {
+    var p = PLANETS[i];
+    if (cmpYm === 'r') return (typeof p.r === 'number' && p.r > 0) ? p.r : null;
+    if (typeof p.m === 'number' && p.m > 0) return p.m;
+    if (typeof p.mj === 'number' && p.mj > 0) return p.mj * 317.8;   // запасной расчёт из M♃
+    return null;
+  }
+
+  function rebuildCmp() {
+    cmpPts = [];
+    for (var i = 0; i < N; i++) {
+      if (!passesFilters(i)) continue;
+      var p = PLANETS[i];
+      if (typeof p.ins !== 'number' || !(p.ins > 0)) continue;
+      var v = cmpValue(i);
+      if (v === null) continue;
+      var x = Math.log(S_IN / p.ins) / Math.log(S_IN / S_OUT);
+      if (cmpHzOnly && !(x > 0 && x < 1)) continue;
+      cmpPts.push({ i: i, x: x, y: v });
+    }
+    cmpCount.textContent = '· ' + cmpPts.length + ' ' +
+      plural(cmpPts.length, 'планета', 'планеты', 'планет') + (cmpHzOnly ? ' в зоне обитаемости' : '');
+    cmpHover = -1;
+  }
+
+  function cmpColor(i) {
+    return colorMode === 'type' ? TYPES[typeIdx[i]].color : GROUPS[groupIdx[i]].color;
+  }
+
+  function drawCompare() {
+    if (!compareOpen || !cmpCtx) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = cmpCanvas.clientWidth, h = cmpCanvas.clientHeight;
+    if (!w || !h) return;
+    cmpCanvas.width = Math.round(w * dpr);
+    cmpCanvas.height = Math.round(h * dpr);
+    cmpCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cmpCtx.clearRect(0, 0, w, h);
+    cmpCtx.font = '11.5px system-ui, -apple-system, "Segoe UI", sans-serif';
+    cmpCtx.lineWidth = 1;
+
+    var L = 64, Rm = 22, T = 18, B = 46;
+    var pw = w - L - Rm, ph = h - T - B;
+    if (pw < 80 || ph < 80) return;
+
+    if (!cmpPts.length) {
+      cmpCtx.fillStyle = '#6d82a8';
+      cmpCtx.textAlign = 'center';
+      cmpCtx.font = '14px system-ui, -apple-system, "Segoe UI", sans-serif';
+      cmpCtx.fillText('Нет данных по текущим фильтрам', w / 2, h / 2);
+      return;
+    }
+
+    var X0 = -1.3, X1 = 2.3;
+    function sx(x) { return L + (x - X0) / (X1 - X0) * pw; }
+
+    var vmin = Infinity, vmax = -Infinity;
+    for (var i = 0; i < cmpPts.length; i++) {
+      if (cmpPts[i].y < vmin) vmin = cmpPts[i].y;
+      if (cmpPts[i].y > vmax) vmax = cmpPts[i].y;
+    }
+    var lmin = Math.log(vmin) / Math.LN10, lmax = Math.log(vmax) / Math.LN10;
+    if (lmax - lmin < 1.2) { var mid = (lmin + lmax) / 2; lmin = mid - 0.7; lmax = mid + 0.7; }
+    var pad = (lmax - lmin) * 0.10;
+    lmin -= pad; lmax += pad;
+    function sy(v) { return T + (1 - ((Math.log(v) / Math.LN10) - lmin) / (lmax - lmin)) * ph; }
+
+    // --- зона обитаемости ---
+    var x0 = sx(0), x1 = sx(1);
+    cmpCtx.fillStyle = 'rgba(110,231,160,0.10)';
+    cmpCtx.fillRect(x0, T, x1 - x0, ph);
+    cmpCtx.strokeStyle = 'rgba(110,231,160,0.42)';
+    cmpCtx.beginPath();
+    cmpCtx.moveTo(Math.round(x0) + 0.5, T); cmpCtx.lineTo(Math.round(x0) + 0.5, T + ph);
+    cmpCtx.moveTo(Math.round(x1) - 0.5, T); cmpCtx.lineTo(Math.round(x1) - 0.5, T + ph);
+    cmpCtx.stroke();
+
+    // --- сетка и подписи по X ---
+    cmpCtx.textAlign = 'center';
+    for (var xt = -1; xt <= 2.001; xt += 0.5) {
+      var px = sx(xt);
+      cmpCtx.strokeStyle = 'rgba(140,175,225,0.10)';
+      cmpCtx.beginPath(); cmpCtx.moveTo(px, T); cmpCtx.lineTo(px, T + ph); cmpCtx.stroke();
+      cmpCtx.fillStyle = '#7d93bb';
+      var lbl = (Math.abs(xt - Math.round(xt)) < 0.01) ? String(Math.round(xt)) : xt.toFixed(1);
+      cmpCtx.fillText(lbl, px, T + ph + 16);
+    }
+
+    // --- сетка и подписи по Y (десятичные порядки) ---
+    cmpCtx.textAlign = 'right';
+    for (var k = Math.ceil(lmin); k <= Math.floor(lmax); k++) {
+      var v = Math.pow(10, k), py = sy(v);
+      cmpCtx.strokeStyle = 'rgba(140,175,225,0.10)';
+      cmpCtx.beginPath(); cmpCtx.moveTo(L, py); cmpCtx.lineTo(L + pw, py); cmpCtx.stroke();
+      cmpCtx.fillStyle = '#7d93bb';
+      cmpCtx.fillText(String(v), L - 8, py + 4);
+    }
+
+    // --- оси ---
+    cmpCtx.strokeStyle = 'rgba(140,175,225,0.5)';
+    cmpCtx.beginPath();
+    cmpCtx.moveTo(L, T); cmpCtx.lineTo(L, T + ph); cmpCtx.lineTo(L + pw, T + ph);
+    cmpCtx.stroke();
+
+    // --- уровень Земли ---
+    if (lmin < 0 && lmax > 0) {
+      var yE = sy(1);
+      cmpCtx.save();
+      cmpCtx.setLineDash([5, 5]);
+      cmpCtx.strokeStyle = 'rgba(255,255,255,0.55)';
+      cmpCtx.beginPath(); cmpCtx.moveTo(L, yE); cmpCtx.lineTo(L + pw, yE); cmpCtx.stroke();
+      cmpCtx.restore();
+      cmpCtx.fillStyle = 'rgba(255,255,255,0.78)';
+      cmpCtx.textAlign = 'left';
+      cmpCtx.fillText('Земля', L + pw - 46, yE - 7);
+    }
+
+    // --- подписи осей ---
+    cmpCtx.fillStyle = '#6d82a8';
+    cmpCtx.textAlign = 'center';
+    cmpCtx.fillText('положение орбиты относительно зоны обитаемости', L + pw / 2, h - 10);
+    cmpCtx.save();
+    cmpCtx.translate(15, T + ph / 2);
+    cmpCtx.rotate(-Math.PI / 2);
+    cmpCtx.fillText(cmpYm === 'r' ? 'радиус, R⊕ (лог. шкала)' : 'масса, M⊕ (лог. шкала)', 0, 0);
+    cmpCtx.restore();
+
+    // --- точки ---
+    cmpCtx.globalAlpha = 0.88;
+    for (var q = 0; q < cmpPts.length; q++) {
+      var pt = cmpPts[q];
+      pt.px = sx(pt.x); pt.py = sy(pt.y);
+      cmpCtx.fillStyle = cmpColor(pt.i);
+      cmpCtx.beginPath(); cmpCtx.arc(pt.px, pt.py, 3.4, 0, TAU); cmpCtx.fill();
+    }
+    cmpCtx.globalAlpha = 1;
+
+    function ring(pt, color) {
+      cmpCtx.strokeStyle = color; cmpCtx.lineWidth = 1.6;
+      cmpCtx.beginPath(); cmpCtx.arc(pt.px, pt.py, 7, 0, TAU); cmpCtx.stroke();
+      cmpCtx.lineWidth = 1;
+    }
+    for (var e = 0; e < cmpPts.length; e++) {
+      if (cmpPts[e].i === selected) { ring(cmpPts[e], '#ffd54f'); break; }
+    }
+    if (cmpHover >= 0 && cmpPts[cmpHover]) ring(cmpPts[cmpHover], '#ffffff');
+  }
+
+  function cmpPick(px, py) {
+    var best = -1, bd = 12 * 12;
+    for (var k = 0; k < cmpPts.length; k++) {
+      var dx = cmpPts[k].px - px, dy = cmpPts[k].py - py;
+      var d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = k; }
+    }
+    return best;
+  }
+
+  function showCmpTip(k, x, y, w) {
+    var pt = cmpPts[k], p = PLANETS[pt.i];
+    var status = pt.x < 0 ? '<div class="t-hot">горячее внутренней границы зоны</div>'
+               : pt.x > 1 ? '<div class="t-cold">холоднее внешней границы зоны</div>'
+               : '<div class="t-hz">в зоне обитаемости</div>';
+    var ins = (typeof p.ins === 'number') ? p.ins : null;
+    cmpTip.innerHTML =
+      '<div class="t-name">' + p.n + '</div>' +
+      '<div class="t-row">X = ' + pt.x.toFixed(2) +
+      (ins !== null ? ' · освещённость ' + (ins >= 10 ? ins.toFixed(1) : ins.toFixed(2)) + ' S⊕' : '') +
+      '</div><div class="t-row">' + (cmpYm === 'r'
+        ? 'Радиус: ' + (pt.y >= 10 ? pt.y.toFixed(1) : pt.y.toFixed(2)) + ' R⊕'
+        : 'Масса: ' + (pt.y >= 100 ? pt.y.toFixed(0) : pt.y >= 10 ? pt.y.toFixed(1) : pt.y.toFixed(3)) + ' M⊕') +
+      '</div>' + status;
+    cmpTip.classList.remove('hidden');
+    cmpTip.style.left = x + 'px';
+    cmpTip.style.top = y + 'px';
+    cmpTip.style.transform = (x > w - 250)
+      ? 'translate(calc(-100% - 16px), -50%)' : 'translate(16px, -50%)';
+  }
+
+  cmpCanvas.addEventListener('pointermove', function (e) {
+    var r = cmpCanvas.getBoundingClientRect();
+    var x = e.clientX - r.left, y = e.clientY - r.top;
+    var k = cmpPick(x, y);
+    if (k !== cmpHover) { cmpHover = k; drawCompare(); }
+    if (k >= 0) showCmpTip(k, x, y, r.width);
+    else cmpTip.classList.add('hidden');
+  });
+  cmpCanvas.addEventListener('pointerleave', function () {
+    cmpHover = -1; cmpTip.classList.add('hidden'); drawCompare();
+  });
+  cmpCanvas.addEventListener('click', function (e) {
+    var r = cmpCanvas.getBoundingClientRect();
+    var k = cmpPick(e.clientX - r.left, e.clientY - r.top);
+    if (k >= 0) select(cmpPts[k].i); else deselect();
+  });
+
+  function openCompare() {
+    compareOpen = true;
+    deselect();
+    cmpEl.classList.remove('hidden');
+    document.body.classList.add('cmp-open');   // легенда и статистика не мешают графику
+    rebuildCmp();
+    drawCompare();
+  }
+  function closeCompare() {
+    compareOpen = false;
+    cmpEl.classList.add('hidden');
+    cmpTip.classList.add('hidden');
+    setCmpHelp(false);
+    document.body.classList.remove('cmp-open');
+  }
+
+  document.getElementById('btnCompare').addEventListener('click', openCompare);
+  document.getElementById('btnCmpClose').addEventListener('click', closeCompare);
+  document.getElementById('cmpSeg').addEventListener('click', function (e) {
+    var ym = e.target.getAttribute && e.target.getAttribute('data-ym');
+    if (!ym || ym === cmpYm) return;
+    cmpYm = ym;
+    var btns = document.getElementById('cmpSeg').children;
+    for (var b = 0; b < btns.length; b++)
+      btns[b].classList.toggle('on', btns[b].getAttribute('data-ym') === ym);
+    rebuildCmp(); drawCompare();
+  });
+  document.getElementById('chHzOnly').addEventListener('change', function (e) {
+    cmpHzOnly = e.target.checked;
+    rebuildCmp(); drawCompare();
+  });
+
+  /* ---------- справка по радиусу и массе ---------- */
+  var cmpHelp = document.getElementById('cmpHelp');
+  var btnCmpHelp = document.getElementById('btnCmpHelp');
+  function setCmpHelp(show) {
+    cmpHelp.classList.toggle('hidden', !show);
+    btnCmpHelp.classList.toggle('on', show);
+  }
+  btnCmpHelp.addEventListener('click', function () {
+    setCmpHelp(cmpHelp.classList.contains('hidden'));
+  });
 
   /* ================= указатель, наведение, клик ================= */
   var mouse = { x: -1, y: -1, dirty: false, down: null };
@@ -787,6 +1249,13 @@
   /* ================= карточка: положение ================= */
   function updatePopupPos() {
     if (selected < 0) return;
+    if (compareOpen) {                              // поверх вида «Сравнение» — справа
+      popup.style.visibility = '';
+      var cw = popup.offsetWidth || 330;
+      popup.style.left = Math.max(12, W - cw - 16) + 'px';
+      popup.style.top = '84px';
+      return;
+    }
     if (!hasDist[selected]) {                       // нет координат — по центру экрана
       popup.style.visibility = '';
       popup.style.left = Math.max(10, W / 2 - 165) + 'px';
@@ -881,6 +1350,7 @@
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
     renderer.setSize(W, H);
+    if (compareOpen) drawCompare();
   });
 
   updateVisibility();

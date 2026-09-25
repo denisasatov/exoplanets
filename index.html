@@ -29,6 +29,7 @@
   <div class="tools">
     <button id="btnGalaxyView" class="btn">Обзор Галактики</button>
     <button id="btnSunView" class="btn">К Солнцу</button>
+    <button id="btnCompare" class="btn" title="Сравнение: положение орбиты относительно зоны обитаемости, размер и масса в единицах Земли">Сравнение</button>
     <label class="chk" title="Логарифмическая шкала расстояний: окрестность Солнца раздвигается">
       <input type="checkbox" id="chLog"><i></i>Лог. шкала</label>
     <label class="chk" title="Подписи ближайших планет при приближении">
@@ -38,8 +39,20 @@
 
 <!-- Легенда и фильтры -->
 <aside id="legend">
+  <button id="legendFold" class="lg-fold" title="Свернуть панель, чтобы ничего не закрывала">◀</button>
   <h3>Метод открытия <span class="muted">(клик — скрыть/показать)</span></h3>
   <div id="legendItems"></div>
+  <button id="btnMethodHelp" class="btn mh-btn"
+          title="Как работают методы открытия экзопланет">? Как находят планеты</button>
+
+  <h3>Тип планеты <span class="muted">(по размеру)</span></h3>
+  <div id="typeItems"></div>
+
+  <h3>Цвет точек</h3>
+  <div class="seg" id="colorMode">
+    <button class="on" data-cm="method">Метод</button>
+    <button data-cm="type">Тип</button>
+  </div>
 
   <h3>Год открытия <span class="year" id="yearValue">1992</span></h3>
   <input type="range" id="yearRange" min="1992" max="2026" value="1992" step="1">
@@ -49,6 +62,9 @@
   <label class="chk"><input type="checkbox" id="chMulti" checked><i></i>Многопланетные системы</label>
   <label class="chk"><input type="checkbox" id="chSingle" checked><i></i>Одиночные планеты</label>
 </aside>
+
+<!-- Возврат панели фильтров, когда она свёрнута -->
+<button id="legendShow" class="btn" title="Показать панель фильтров">☰ Фильтры</button>
 
 <!-- Статистика -->
 <div id="stats"></div>
@@ -66,6 +82,111 @@
 <div id="popup" class="hidden" role="dialog" aria-modal="false">
   <button id="popupClose" class="popup-close" title="Закрыть">✕</button>
   <div id="popupBody"></div>
+</div>
+
+<!-- Справка: методы открытия экзопланет -->
+<div id="methodHelp" class="hidden" role="dialog" aria-label="Методы открытия экзопланет">
+  <div class="mh-card">
+    <div class="mh-head">
+      <div class="mh-title">Как находят экзопланеты</div>
+      <button id="mhClose" class="btn" title="Закрыть справку">✕ Закрыть</button>
+    </div>
+
+    <p class="mh-intro">Планету почти никогда не видят в телескоп напрямую: она мала, а блеск
+      звезды её полностью «гасит». Вместо этого ищут <b>косвенные признаки</b> — как планета
+      меняет свет и движение своей звезды. Цвет точки в легенде и в карточке планеты
+      показывает метод, которым её открыли.</p>
+
+    <div class="mh-list" id="mhList"></div>
+
+    <div class="mh-foot">Открыто <b id="mhTotal">—</b> планет · данные:
+      <a target="_blank" rel="noopener" href="https://exoplanetarchive.ipac.caltech.edu/">NASA
+      Exoplanet Archive</a> (таблица PSCompPars). Метод указан в карточке каждой планеты.</div>
+  </div>
+</div>
+
+<!-- Вид «Сравнение»: орбита и размер относительно зоны обитаемости -->
+<div id="compare" class="hidden">
+  <div class="cmp-head">
+    <div class="cmp-title">Орбита и размер относительно зоны обитаемости
+      <span class="muted" id="cmpCount"></span></div>
+    <div class="cmp-ctrl">
+      <div class="seg" id="cmpSeg">
+        <button class="on" data-ym="r">Радиус, R⊕</button>
+        <button data-ym="m">Масса, M⊕</button>
+      </div>
+      <label class="chk"><input type="checkbox" id="chHzOnly"><i></i>Только в зоне</label>
+      <button id="btnCmpHelp" class="btn" title="Что означают радиус и масса: единицы, ориентиры, пороги типов">? Справка</button>
+      <button id="btnCmpClose" class="btn">Закрыть</button>
+    </div>
+  </div>
+  <div class="cmp-canvas">
+    <canvas id="cmpCanvas"></canvas>
+    <div id="cmpTip" class="hidden"></div>
+
+    <!-- Справка по осям Y: радиус и масса -->
+    <div id="cmpHelp" class="hidden">
+      <div class="hp-title">Радиус и масса на этом графике</div>
+
+      <div class="hp-sec">
+        <div class="hp-h">Единицы и шкала</div>
+        <p><b>R⊕</b> — радиус Земли: 6371 км (диаметр 12 742 км).<br>
+           <b>M⊕</b> — масса Земли: 5,97·10²⁴ кг ≈ 1/318 массы Юпитера.</p>
+        <p>Шкала по вертикали <b>логарифмическая</b>: одна линия сетки — это ×10,
+           поэтому одинаковые расстояния означают одинаковые <i>отношения</i> величин.
+           Белый пунктир — уровень Земли (1 R⊕ / 1 M⊕).</p>
+      </div>
+
+      <div class="hp-sec">
+        <div class="hp-h">Ориентиры</div>
+        <table class="hp-table">
+          <tr><th>Планета</th><th>Радиус, R⊕</th><th>Масса, M⊕</th></tr>
+          <tr><td>Марс</td><td>0,53</td><td>0,11</td></tr>
+          <tr class="earth"><td>Земля</td><td>1</td><td>1</td></tr>
+          <tr><td>Нептун</td><td>3,9</td><td>17</td></tr>
+          <tr><td>Сатурн</td><td>9,1</td><td>95</td></tr>
+          <tr><td>Юпитер</td><td>11,2</td><td>318</td></tr>
+        </table>
+      </div>
+
+      <div class="hp-sec">
+        <div class="hp-h">Типы планет — пороги по радиусу</div>
+        <div class="hp-types">
+          <span><i style="background:#e29578"></i>&lt; 1,5 — землеподобные</span>
+          <span><i style="background:#a3e635"></i>1,5 – 2,5 — суперземли</span>
+          <span><i style="background:#22d3ee"></i>2,5 – 4 — мини-нептуны</span>
+          <span><i style="background:#6366f1"></i>4 – 8 — ледяные гиганты</span>
+          <span><i style="background:#f0abfc"></i>≥ 8 — газовые гиганты</span>
+        </div>
+        <p>Пунктиром цвета на графике показаны эти пороги (только в режиме «Радиус»).
+           Если радиус не измерен, тип определяется по массе: &lt; 2, &lt; 10, &lt; 50,
+           &lt; 300, ≥ 300 M⊕.</p>
+      </div>
+
+      <div class="hp-sec">
+        <div class="hp-h">Откуда данные</div>
+        <p>Радиусы получают в основном <b>транзитным</b> методом — по глубине затмения
+           диска звезды. Массы — по <b>лучевым скоростям</b> звезды и вариантам
+           времени транзитов; у части планет масса пересчитана из M♃ (×317,8).</p>
+        <p>Планеты без измеренного радиуса (в режиме «Радиус») или массы
+           (в режиме «Масса») на график не выводятся — они учтены в счётчике
+           в заголовке.</p>
+      </div>
+
+      <div class="hp-sec">
+        <div class="hp-h">Ось X</div>
+        <p><b>0</b> — внутренняя граница зоны обитаемости, <b>1</b> — внешняя
+           (зелёная полоса). Слева от полосы — «горячее», справа — «холоднее».
+           <b>Клик по точке</b> — карточка планеты.</p>
+      </div>
+    </div>
+  </div>
+  <div class="cmp-foot">
+    Ось X: <b>0</b> — внутренняя граница зоны обитаемости, <b>1</b> — внешняя граница
+    (в лог. шкале, так разные звёзды сведены к одной шкале) ·
+    Ось Y: в единицах Земли, лог. шкала, пунктир — уровень Земли ·
+    зелёная полоса — зона обитаемости · <b>клик по точке</b> — карточка
+  </div>
 </div>
 
 <!-- Подписи на карте -->

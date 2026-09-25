@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>selftest</title>
+<style>
+  body{font:13px/1.5 Consolas,monospace;background:#0b1220;color:#cfe0ff;margin:12px}
+  iframe{width:960px;height:600px;border:1px solid #2a3f63}
+  #out{white-space:pre-wrap}
+</style>
+</head>
+<body>
+<h3>Самотест карты экзопланет</h3>
+<pre id="out">выполняется…</pre>
+<iframe id="f" src="/index.html" width="960" height="600"></iframe>
+
+<script>
+var R = [];
+function ok(name, cond, extra) {
+  R.push((cond ? 'PASS ' : 'FAIL ') + name + (extra !== undefined ? '  :: ' + extra : ''));
+}
+
+setTimeout(function () {
+  try {
+    var f = document.getElementById('f'), w = f.contentWindow, d = f.contentWindow.document;
+
+    ok('страница загрузилась (ExoMap)', !!(w.ExoMap && w.ExoMap.planetCount > 5000),
+       w.ExoMap ? w.ExoMap.planetCount : 'нет ExoMap');
+    ok('загрузчик скрыт', d.getElementById('loader').classList.contains('done'));
+
+    /* --- легенда методов и типов --- */
+    var li = d.getElementById('legendItems').children;
+    ok('легенда методов: 9 пунктов', li.length === 9, li.length);
+    var ti = d.getElementById('typeItems').children;
+    ok('легенда типов: 6 пунктов', ti.length === 6, ti.length);
+    ok('строка типа с числом', /\d/.test(ti[0].textContent), ti[0].textContent);
+
+    var before = w.ExoMap.stats().visible;
+    ti[5].click();
+    var after = w.ExoMap.stats().visible;
+    ok('фильтр типа меняет видимость', after !== before, before + ' -> ' + after);
+    ti[5].click();
+    ok('фильтр типа возвращается', w.ExoMap.stats().visible === before);
+
+    var mBefore = w.ExoMap.stats().visible;
+    li[0].click();
+    ok('фильтр метода работает', w.ExoMap.stats().visible !== mBefore);
+    li[0].click();
+
+    /* --- цвет точек --- */
+    var cm = d.getElementById('colorMode');
+    cm.children[1].click();
+    ok('цвет: режим «Тип» включён',
+       cm.children[1].classList.contains('on') && !cm.children[0].classList.contains('on'));
+    cm.children[0].click();
+    ok('цвет: возврат «Метод»', cm.children[0].classList.contains('on'));
+
+    /* --- вид «Сравнение» --- */
+    d.getElementById('btnCompare').click();
+    var cmp = d.getElementById('compare');
+    ok('сравнение открылось', !cmp.classList.contains('hidden'));
+    var cnt = d.getElementById('cmpCount').textContent;
+    ok('счётчик заполнен', /планет/.test(cnt), cnt);
+    ok('легенда скрыта (не перекрывает график)',
+       w.getComputedStyle(d.getElementById('legend')).display === 'none');
+
+    var cv = d.getElementById('cmpCanvas');
+    var ctx = cv.getContext('2d');
+    var px = ctx.getImageData(0, 0, cv.width, cv.height).data;
+    var nz = 0;
+    for (var i = 3; i < px.length; i += 400) if (px[i] > 0) nz++;
+    ok('канва отрисована (непустая)', nz > 100, nz + ' непустых выборок');
+
+    d.getElementById('cmpSeg').children[1].click();
+    ok('сегмент «Масса» переключён', d.getElementById('cmpSeg').children[1].classList.contains('on'));
+    d.getElementById('cmpSeg').children[0].click();
+
+    var hz = d.getElementById('chHzOnly');
+    hz.checked = true;
+    hz.dispatchEvent(new w.Event('change'));
+    var cntHz = d.getElementById('cmpCount').textContent;
+    var n0 = parseInt(cnt.replace(/\D+/g, ''), 10), n1 = parseInt(cntHz.replace(/\D+/g, ''), 10);
+    ok('фильтр «только в зоне»', n1 > 0 && n1 <= n0, n0 + ' -> ' + n1);
+    hz.checked = false;
+    hz.dispatchEvent(new w.Event('change'));
+
+    /* --- карточка + изображение --- */
+    ok('выбор планеты', w.ExoMap.select('HAT-P-8 b'));
+    var pop = d.getElementById('popup');
+    ok('карточка открыта', !pop.classList.contains('hidden'));
+    var pimg = pop.querySelector('.pimg img');
+    ok('изображение планеты сгенерировано',
+       !!(pimg && pimg.src.indexOf('data:image/jpeg') === 0),
+       pimg ? pimg.src.slice(0, 26) : 'нет .pimg img');
+    ok('карточка позиционирована справа', parseInt(pop.style.left, 10) >= w.innerWidth - 420,
+       pop.style.left + ' / ' + w.innerWidth);
+
+    /* --- закрытие по Escape --- */
+    w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+    ok('Escape закрывает сравнение', cmp.classList.contains('hidden'));
+    w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape' }));
+    ok('Escape закрывает карточку', pop.classList.contains('hidden'));
+    ok('легенда снова видна',
+       w.getComputedStyle(d.getElementById('legend')).display !== 'none');
+  } catch (e) {
+    ok('ИСКЛЮЧЕНИЕ', false, (e && e.message) + ' | ' + (e && e.stack));
+  }
+
+  R.forEach(function (l) { console.log('SELFTEST ' + l); });
+  document.getElementById('out').textContent = R.join('\n');
+  var fails = R.filter(function (l) { return l.indexOf('FAIL') === 0; }).length;
+  document.title = 'SELFTEST DONE fails=' + fails;
+}, 2500);
+</script>
+</body>
+</html>

@@ -77,12 +77,33 @@ canvas{display:block}
   background:var(--panel);border:1px solid var(--panel-border);
   border-radius:14px;padding:14px 15px;backdrop-filter:blur(12px);
   box-shadow:var(--shadow);
+  /* не доходит до блока статистики внизу и не вылезает за экран */
+  max-height:calc(100vh - 150px);
+  overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;
+  scrollbar-color:rgba(120,180,255,.28) transparent;
+  transition:transform .22s ease,opacity .22s ease;
 }
+#legend::-webkit-scrollbar{width:8px}
+#legend::-webkit-scrollbar-thumb{background:rgba(120,180,255,.28);border-radius:4px}
+#legend::-webkit-scrollbar-track{background:transparent}
+#legend.hide{transform:translateX(calc(-100% - 20px));opacity:0;pointer-events:none}
+#legend h3:first-of-type{padding-right:26px}
+.lg-fold{
+  position:absolute;top:9px;right:9px;width:22px;height:22px;border-radius:7px;
+  border:1px solid rgba(120,180,255,.25);background:rgba(255,255,255,.05);
+  color:#8ea3c9;cursor:pointer;font-size:11px;line-height:1;transition:.15s;
+}
+.lg-fold:hover{background:rgba(86,200,255,.18);color:#fff;border-color:var(--accent)}
+#legendShow{
+  position:fixed;left:14px;top:78px;z-index:21;display:none;
+  background:var(--panel);backdrop-filter:blur(10px);box-shadow:var(--shadow);
+}
+#legendShow.on{display:block}
 #legend h3{
   margin:0 0 9px;font-size:11.5px;text-transform:uppercase;letter-spacing:.8px;
   color:#8fa8d6;font-weight:600;display:flex;justify-content:space-between;align-items:center;
 }
-#legend h3:not(:first-child){margin-top:16px}
+#legend h3:not(:first-child){margin-top:14px}
 #legend h3 .year{color:var(--accent);font-size:13px;letter-spacing:0}
 .lg-item{
   display:flex;align-items:center;gap:9px;padding:5px 6px;border-radius:8px;
@@ -107,6 +128,128 @@ input[type=range]::-moz-range-thumb{
   width:13px;height:13px;border-radius:50%;background:#eaf7ff;border:2px solid var(--accent);cursor:pointer;
 }
 .scale-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;margin-top:4px}
+
+/* ---------- сегментированные переключатели ---------- */
+.seg{
+  display:inline-flex;border:1px solid rgba(120,180,255,.28);border-radius:9px;
+  overflow:hidden;background:rgba(255,255,255,.04);
+}
+.seg button{
+  padding:6px 12px;border:none;background:transparent;color:#8ea3c9;
+  font-size:12.5px;cursor:pointer;transition:.15s;
+}
+.seg button:hover{color:#dbe7ff;background:rgba(255,255,255,.06)}
+.seg button.on{background:rgba(86,200,255,.28);color:#fff}
+#colorMode{width:100%}
+#colorMode button{flex:1}
+
+/* ---------- карточка: фото планеты ---------- */
+.pimg{
+  margin:-2px 0 10px;border-radius:11px;overflow:hidden;
+  background:rgba(255,255,255,.04);border:1px solid rgba(120,180,255,.16);
+  min-height:0;
+}
+.pimg:empty{display:none}
+.pimg .pimg-load{
+  display:flex;align-items:center;justify-content:center;height:84px;
+  color:#6d82a8;font-size:12px;gap:8px;
+}
+.pimg .pimg-none{
+  padding:8px 10px;color:#6d82a8;font-size:11.5px;text-align:center;
+}
+.pimg img{display:block;width:100%;max-height:190px;object-fit:cover}
+.pimg .pimg-cap{
+  padding:4px 8px;font-size:10.5px;color:#66799c;background:rgba(4,8,16,.72);
+}
+.pimg .pimg-cap a{color:#7fb6ff;text-decoration:none}
+
+/* ---------- вид «Сравнение» ---------- */
+#compare{
+  position:fixed;inset:0;z-index:15;padding-top:54px;
+  display:flex;flex-direction:column;
+  background:rgba(4,7,14,.965);backdrop-filter:blur(6px);
+  animation:cmpIn .2s ease-out;
+}
+@keyframes cmpIn{from{opacity:0}to{opacity:1}}
+#compare.hidden{display:none}
+/* полноэкранный вид: панели карты прячутся, остаётся только шапка */
+body.cmp-open #legend,
+body.cmp-open #stats,
+body.cmp-open #hint,
+body.cmp-open #labelLayer{display:none}
+.cmp-head{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:10px 18px 8px;
+}
+.cmp-title{font-size:15px;font-weight:600;color:#fff}
+.cmp-title .muted{font-weight:400;font-size:12px;margin-left:8px}
+.cmp-ctrl{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.cmp-canvas{position:relative;flex:1;min-height:0;margin:0 12px}
+.cmp-canvas canvas{position:absolute;inset:0;width:100%;height:100%}
+#cmpTip{
+  position:absolute;z-index:5;pointer-events:none;transform:translate(14px,-50%);
+  background:rgba(6,11,22,.96);border:1px solid rgba(86,200,255,.45);
+  border-radius:9px;padding:7px 11px;font-size:12.5px;white-space:nowrap;
+  box-shadow:0 6px 22px rgba(0,0,0,.65);
+}
+#cmpTip .t-name{font-weight:600;color:#fff}
+#cmpTip .t-row{color:#a9bde0;font-size:11.5px;margin-top:2px}
+#cmpTip .t-hz{color:#6ee7a0}
+#cmpTip .t-hot{color:#ff9d7a}
+#cmpTip .t-cold{color:#8fb8ff}
+#cmpTip.hidden{display:none}
+
+/* ---------- справка в виде «Сравнение» ---------- */
+#cmpHelp{
+  position:absolute;top:12px;right:12px;z-index:6;
+  width:352px;max-width:calc(100% - 24px);
+  max-height:calc(100% - 24px);overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:rgba(120,180,255,.28) transparent;
+  background:rgba(7,12,24,.96);border:1px solid rgba(86,200,255,.38);
+  border-radius:14px;padding:14px 16px 15px;backdrop-filter:blur(14px);
+  box-shadow:0 14px 44px rgba(0,0,0,.62);
+  animation:cmpHelpIn .18s ease-out;
+}
+@keyframes cmpHelpIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+#cmpHelp.hidden{display:none}
+#cmpHelp::-webkit-scrollbar{width:8px}
+#cmpHelp::-webkit-scrollbar-thumb{background:rgba(120,180,255,.28);border-radius:4px}
+#cmpHelp::-webkit-scrollbar-track{background:transparent}
+.hp-title{font-size:14px;font-weight:600;color:#fff;margin:0 0 10px}
+.hp-sec{padding-top:11px;margin-top:11px;border-top:1px dashed rgba(127,155,208,.3)}
+.hp-sec:first-of-type{padding-top:0;margin-top:0;border-top:none}
+.hp-h{
+  font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#7f9bd0;
+  font-weight:600;margin-bottom:6px;
+}
+#cmpHelp p{margin:6px 0 0;font-size:12.5px;line-height:1.55;color:#a9bde0}
+#cmpHelp p:first-of-type{margin-top:0}
+#cmpHelp b{color:#eaf3ff}
+.hp-table{
+  width:100%;border-collapse:collapse;font-size:12.5px;
+  font-variant-numeric:tabular-nums;
+}
+.hp-table th{
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:#7f9bd0;
+  font-weight:600;text-align:right;padding:0 6px 5px;
+}
+.hp-table th:first-child{text-align:left}
+.hp-table td{
+  padding:4px 6px;color:#cfe1ff;text-align:right;
+  border-top:1px solid rgba(127,155,208,.16);
+}
+.hp-table td:first-child{text-align:left;color:#8ea3c9}
+.hp-table tr.earth td{color:#ffd54f;font-weight:600;background:rgba(255,213,79,.07)}
+.hp-types{display:flex;flex-direction:column;gap:5px;margin-bottom:6px}
+.hp-types span{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#a9bde0}
+.hp-types i{
+  width:11px;height:11px;border-radius:50%;flex:none;
+  box-shadow:0 0 7px currentColor;
+}
+.cmp-foot{
+  padding:8px 18px 12px;font-size:11.5px;color:#6d82a8;line-height:1.55;
+}
+.cmp-foot b{color:#9db4dc}
 
 /* ---------- статистика / подсказка ---------- */
 #stats{
@@ -203,6 +346,7 @@ input[type=range]::-moz-range-thumb{
 /* ---------- мобильные экраны ---------- */
 @media (max-width:900px){
   #legend{display:none}
+  #legendShow{display:none !important}
   #hint{display:none}
   .brand .subtitle{display:none}
   #topbar{gap:10px;padding:8px 10px}
